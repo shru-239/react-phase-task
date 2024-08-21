@@ -1,92 +1,137 @@
 import React, { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
+import clockSound from '../assets/Clock.mp3'
 import '../App.css';
 
 const PhaserGame = ({ onSessionEnd, sessionData }) => {
     const gameRef = useRef(null);
     const ballRef = useRef(null);
     const countdownTextRef = useRef(null);
-    let sessionActive = false;
-    let countdownValue = 0;
-    let countdownTimer;
-    let startTime;
+    const sessionActiveRef = useRef(false);
+    const countdownValueRef = useRef(0);
+    const countdownTimerRef = useRef(null);
+    const startTimeRef = useRef(null);
+    const soundRef = useRef(null);
 
     const startSession = () => {
-        sessionActive = true;
-        countdownValue = Phaser.Math.Between(30, 120);
-        startTime = new Date().toLocaleTimeString();
+        sessionActiveRef.current = true;
+        countdownValueRef.current = Phaser.Math.Between(30, 120);
+        startTimeRef.current = new Date().toLocaleTimeString();
 
-        countdownTimer = setInterval(() => {
-            countdownValue--;
-            if (countdownValue <= 0) {
+        // Start the ball movement
+        if (ballRef.current) {
+            // ballRef.current.setVelocity(0, -400);
+            const randomVelocityX = Phaser.Math.Between(-400, 400);  // Increase speed on X-axis
+            const randomVelocityY = Phaser.Math.Between(-400, 400);  // Increase speed on Y-axis
+            ballRef.current.setVelocity(randomVelocityX, randomVelocityY);
+        }
+
+        // Play the sound
+        if (soundRef.current && soundRef.current.isDecoded) { // Check if sound is decoded first
+            soundRef.current.play();
+            console.log('Attempting to play sound');
+        } else {
+            console.log('Sound reference not found');
+        }
+
+        countdownTimerRef.current = setInterval(() => {
+            countdownValueRef.current--;
+            if (countdownValueRef.current <= 0) {
                 endSession();
             }
         }, 1000);
     };
 
     const endSession = () => {
-        sessionActive = false;
-        clearInterval(countdownTimer);
+        sessionActiveRef.current = false;
+        clearInterval(countdownTimerRef.current);
 
         const endTime = new Date().toLocaleTimeString();
         onSessionEnd({
             id: Math.random().toString(36).substr(2, 9),
-            startTime,
+            startTime: startTimeRef.current,
             endTime
         });
 
-        gameRef.current.sound.stopAll();
+        // Stop the ball and sound
+        if (ballRef.current) {
+            ballRef.current.setVelocity(0, 0);
+        }
+        if (soundRef.current && soundRef.current.isPlaying) {
+            soundRef.current.stop();
+        }
     };
 
     useEffect(() => {
         const config = {
             type: Phaser.AUTO,
-            width: 800,
-            height: 400,
+            width: 1000,
+            height: 500,
+            parent: 'phaser-game',
             physics: {
                 default: 'arcade',
                 arcade: {
-                    gravity: { y: 0 },
-                    debug: false
+                    gravity: { y: 600 },
+                    debug: false,
                 }
             },
             scene: {
                 preload: preload,
                 create: create,
                 update: update
+            },
+            audio: {
+                disableWebAudio: false
             }
         };
 
         gameRef.current = new Phaser.Game(config);
 
         function preload() {
-            this.load.image('Ball', 'ball.png');
-            this.load.audio('clockSound', 'Clock.mp3');
+            this.load.on('filecomplete', (key, success, file) => {
+                console.log('File complete:', key, success, file);
+            });
+            this.load.image('Ball', 'ball1.png');
+            this.load.audio('clockSound', clockSound, onAudioLoadComplete);
+        }
+
+        function onAudioLoadComplete() {
+            soundRef.current = this.sound.add('clockSound', { loop: true });
+            console.log('Clock sound loaded and decoded');
         }
 
         function create() {
-            ballRef.current = this.physics.add.image(20, 10, 'Ball')
-                .setVelocity(Phaser.Math.Between(-200, 200), Phaser.Math.Between(-200, 200))
+            ballRef.current = this.physics.add.image(500, 250, 'Ball')
+                .setScale(0.15)
                 .setBounce(1)
-                .setCollideWorldBounds(true);
+                .setCollideWorldBounds(true)
+                .setVelocity(0, 0);  // Start with no velocity
 
-            countdownTextRef.current = this.add.text(16, 16, 'Countdown: ', { fontSize: '32px', fill: '#000' });
+            countdownTextRef.current = this.add.text(16, 16, 'Countdown: ', { fontSize: '32px', fill: 'white' });
 
-            this.sound.add('clockSound');
+            // soundRef.current = this.sound.add('clockSound', { loop: true });
+            // const sound = this.sound.add('clockSound', { loop: true });
+            soundRef.current = this.sound.add('clockSound', { loop: true });
+            console.log('Sound reference:', soundRef.current);
+
+            try {
+                soundRef.current.play();
+                console.log('Audio played');
+            } catch (error) {
+                console.error('Error playing audio:', error);
+            }
         }
 
         function update() {
-            if (sessionActive && countdownValue > 0) {
-                countdownTextRef.current.setText('Countdown: ' + countdownValue);
-
-                if (!this.sound.get('clockSound').isPlaying) {
-                    this.sound.play('clockSound', { loop: true });
-                }
+            if (sessionActiveRef.current && countdownValueRef.current > 0) {
+                countdownTextRef.current.setText('Countdown: ' + countdownValueRef.current);
             }
         }
 
         return () => {
-            gameRef.current.destroy(true);
+            if (gameRef.current) {
+                gameRef.current.destroy(true);
+            }
         };
     }, [onSessionEnd]);
 
