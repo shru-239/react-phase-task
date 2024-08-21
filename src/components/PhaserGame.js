@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 import clockSound from '../assets/Clock.mp3'
 import '../App.css';
@@ -13,7 +13,8 @@ const PhaserGame = ({ onSessionEnd, sessionData }) => {
     const startTimeRef = useRef(null);
     const soundRef = useRef(null);
 
-    const startSession = () => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const startSession = useCallback(() => {
         sessionActiveRef.current = true;
         countdownValueRef.current = Phaser.Math.Between(30, 120);
         startTimeRef.current = new Date().toLocaleTimeString();
@@ -40,7 +41,7 @@ const PhaserGame = ({ onSessionEnd, sessionData }) => {
                 endSession();
             }
         }, 1000);
-    };
+    });
 
     const endSession = () => {
         sessionActiveRef.current = false;
@@ -139,7 +140,7 @@ const PhaserGame = ({ onSessionEnd, sessionData }) => {
         if (sessionData.active) {
             startSession();
         }
-    }, [sessionData]);
+    }, [sessionData,startSession]);
 
     return (
         <div id="phaser-game" className="phaser-container"></div>
